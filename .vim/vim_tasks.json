@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Run expr",
+    "command": "execute \"normal! vip\\<esc>\" | execute \"TREPLSendSelection\"",
+    "default": true,
+    "type": "vim",
+    "keep_scroll": true
+  },
+  {
+    "name": "Start REPL",
+    "command": "guile"
+  }
+]
