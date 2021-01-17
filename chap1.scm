@@ -1,8 +1,9 @@
+(use-modules (srfi srfi-78) ;tests
+             (srfi srfi-19) ;time
+             (ice-9 format))
 (define (square x) (* x x))
-
 (define (inc . args) (apply 1+ args))
 (define (dec . args) (apply 1- args))
-
 (define (average x y)
   (/ (+ x y) 2))
 
@@ -53,6 +54,53 @@
                    kinds-of-coins)))))
   (cc amount 5))
 
+;; 1.2.5 - Euclid's algorithm
+(define (gcd a b)
+  (if (= b 0)
+      a
+      (gcd b (remainder a b))))
+
+;; 1.2.6 - Testing for primality
+(define (prime? n)
+  (define (smallest-divisor n)
+    (define (find-divisor n test-divisor)
+      (cond ((> (square test-divisor) n) n)
+            ((divides? test-divisor n) test-divisor)
+            (else (find-divisor n (inc test-divisor)))))
+    (define (divides? a b)
+      (= (remainder b a ) 0))
+    (find-divisor n 2))
+  (= n (smallest-divisor n)))
+
+(define (fast-prime? n times)
+  (define (expmod base exp m)
+    (cond ((= exp 0) 1)
+          ((even? exp)
+           (remainder (square (expmod base (/ exp 2) m))
+                      m))
+          (else
+            (remainder (* base (expmod base (dec exp) m))
+                       m))))
+  (define (fermat-test n)
+    (define (try-it a)
+      (= (expmod a n n) a))
+    (try-it (inc (random (dec n)))))
+  (cond ((= times 0) #t)
+        ((fermat-test n)
+         (fast-prime? n (dec times)))
+        (else #f)))
+
+;; 1.3 - Integral
+(define (cube x) (* x x x))
+(define (sum term a next b)
+  (if (> a b)
+      0
+      (+ (term a)
+         (sum term (next a) next b))))
+(define (integral f a b dx)
+  (define (add-dx x) (+ x dx))
+  (* (sum f (+ a (/ dx 2.0)) add-dx b)
+     dx))
 
 ;; Exercise 1.7
 (define (sqrt1 x)
@@ -131,3 +179,254 @@
   (f 0 1 2 0))
 
 (f-iter 10)
+
+;; Exercise 1.12
+(define (pascal-triangle row col)
+  (cond ((or (= 0 row) (= 0 col) (= row col)) 1)
+        (else (+ (pascal-triangle (dec row) col)
+                 (pascal-triangle (dec row) (dec col))))))
+
+(check (pascal-triangle 0 0) => 1)
+(check (pascal-triangle 0 5) => 1)
+(check (pascal-triangle 5 0) => 1)
+(check (pascal-triangle 5 5) => 1)
+
+(check (pascal-triangle 4 3) => 4)
+(check (pascal-triangle 4 2) => 6)
+
+;; Exercise 1.16
+(define (iter-expt b n)
+  (define (iter-expt-iter acc b n)
+    (cond ((= n 0) acc)
+          ((even? n)
+           (iter-expt-iter acc (square b) (/ n 2)))
+          (else
+            (iter-expt-iter (* acc b) b (dec n)))))
+  (iter-expt-iter 1 b n))
+
+(check (iter-expt 2 8) => 256)
+(check (iter-expt 2 11) => 2048)
+(check (iter-expt 3 7) => 2187)
+
+;; Exercise 1.17
+(define (fast-mult a b)
+  (define (double n) (+ n n))
+  (define (halve n) (/ n 2))
+  (cond ((= b 0) 0)
+        ((even? b) (double (fast-mult a (halve b))))
+        (else (+ a (fast-mult a (dec b))))))
+
+(check (fast-mult 12 10) => 120)
+
+;; Exercise 1.18
+(define (iter-mult b n)
+  (define (double n) (+ n n))
+  (define (halve n) (/ n 2))
+  (define (iter-mult-iter acc b n)
+    (cond ((= n 0) acc)
+          ((even? n)
+           (iter-mult-iter acc (double b) (halve n)))
+          (else
+            (iter-mult-iter (+ acc b) b (dec n)))))
+  (iter-mult-iter 0 b n))
+
+(check (iter-mult 2 8) => 16)
+(check (iter-mult 2 11) => 22)
+(check (iter-mult 3 7) => 21)
+
+;; Exercise 1.19
+;; ,trace does not show functions defined within functions
+(define (fast-fib n)
+  (fast-fib-iter 1 0 0 1 n))
+(define (fast-fib-iter a b p q count)
+  (cond ((= count 0) 
+         b)
+        ((even? count)
+         (fast-fib-iter a
+                        b
+                        (+ (* p p) (* q q))
+                        (+ (* 2 p q) (* q q))
+                        (/ count 2)))
+        (else 
+          (fast-fib-iter (+ (* b q) 
+                            (* a q) 
+                            (* a p))
+                         (+ (* b p) 
+                            (* a q))
+                         p
+                         q
+                         (- count 1)))))
+,trace (fast-fib 12)
+
+;; Exercise 1.21
+(smallest-divisor 199)
+(smallest-divisor 1999)
+(smallest-divisor 19999)
+
+;; Exercise 1.22
+(define (timed-prime-test fn n)
+  (define (report-prime elapsed-time)
+    (format #t "~%~a *** ~a(ms)" n (exact->inexact (/ (time-nanosecond elapsed-time) 1000000))))
+  (define (start-prime-test n start-time)
+    (when (fn n)
+      (report-prime (time-difference (current-time) start-time))))
+  (start-prime-test n (current-time)))
+
+(define (search-for-primes fn min max)
+  (define (iter current)
+    (when (<= current max)
+      (timed-prime-test fn current)
+      (iter (+ current 2))))
+  (iter (if (odd? min) min (inc min)))
+  (newline))
+
+(search-for-primes prime? 1000000000000000 1000000000000063)
+
+;; Exercise 1.23
+(define (prime1? n)
+  (define (next n) (if (= n 2) 3 (+ n 2)))
+  (define (smallest-divisor n)
+    (define (find-divisor n test-divisor)
+      (cond ((> (square test-divisor) n) n)
+            ((divides? test-divisor n) test-divisor)
+            (else (find-divisor n (next test-divisor)))))
+    (define (divides? a b)
+      (= (remainder b a ) 0))
+    (find-divisor n 2))
+  (= n (smallest-divisor n)))
+
+; Actually, it is slower??? wtf
+(search-for-primes prime1? 1000000000000000 1000000000000063)
+
+;; Exercise 1.24
+(search-for-primes (lambda (p) (fast-prime? p 100)) 1000000000000000 1000000000000063)
+
+;; Exercise 1.27
+(define (all-primes? ns)
+  (cond ((null? ns) #t)
+        ((not (fast-prime? (car ns) 10000)) #f)
+        (else (all-primes? (cdr ns)))))
+
+(all-primes? '( 561 1105 1729 2465 2821 6601))
+
+;; Exercise 1.28
+(define (miller-rabin? n)
+  (define (non-trivial-sqrt? x n)
+    (cond ((= x 1) #f)
+          ((= x (dec n)) #f)
+          (else (= (remainder (square x) n) 1))))
+  (define (expmod base exp m)
+    (cond ((= exp 0) 1)
+          ((even? exp)
+           (let ((x (expmod base (/ exp 2) m)))
+             (if (non-trivial-sqrt? x m)
+                 0
+                 (remainder (square x) m))))
+          (else
+            (remainder (* base (expmod base (dec exp) m))
+                       m))))
+  (define (miller-rabin-test a n)
+    (cond ((= a 0) #t)
+          ((= (expmod a (dec n) n) 1)
+           (miller-rabin-test (dec a) n))
+          (else #f)))
+  (miller-rabin-test (dec n) n))
+
+(check (miller-rabin? 561) => #f)
+(check (fast-prime? 561 10000) => #t)
+
+;; Exercise 1.29
+(define (simpson-rule f a b n)
+  (define h (/ (- b a) n))
+  (define (y k) (f (+ a (* k h))))
+  (define (simpson-term k)
+    (* (cond ((= k 0) 1)
+             ((= k n) 1)
+             ((even? k) 2)
+             (else 4))
+       (y k)))
+  (* (/ h 3) (sum simpson-term 0 inc n)))
+
+(simpson-rule cube 0.0 1.0 100)
+(simpson-rule cube 0.0 1.0 1000)
+(integral cube 0 1 0.001)
+
+;; Exercise 1.30
+(define (sum-iter term a next b)
+  (define (iter a result)
+    (if (> a b)
+        result
+        (iter (next a) (+ (term a) result))))
+  (iter a 0))
+
+(define (identity x) x)
+(check  (sum-iter identity 1 inc 30) => (sum identity 1 inc 30))
+
+;;Exercise 1.31
+(define (product term a next b)
+  (if (> a b)
+      1
+      (* (term a)
+         (product term (next a) next b))))
+(define (product-iter term a next b)
+  (define (iter a result)
+    (if (> a b)
+        result
+        (iter (next a) (* (term a) result))))
+  (iter 1 1))
+
+(define (factorial n)
+  (product identity 1 inc n))
+(define (factorial-iter n)
+  (product-iter identity 1 inc n))
+(check (factorial 5) => (factorial-iter 5))
+
+(define (pi-aprox n)
+  (define (pi-term n)
+    (if (even? n)
+        (/ (+ n 2) (inc n))
+        (/ (inc n) (+ n 2))))
+  (* 4.0 (product-iter pi-term 1 inc n)))
+(pi-aprox 600000)
+
+;; Exercise 1.32
+(define (accumulate combiner null-value term a next b)
+  (define (helper a)
+    (if (> a b)
+        null-value
+        (combiner (term a)
+                  (helper (next a)))))
+  (helper a))
+
+(define (accumulate-iter combiner null-value term a next b)
+  (define (helper a result)
+    (if (> a b)
+        result
+        (helper (next a) (combiner (term a) result))))
+  (helper a null-value))
+
+(check (accumulate * 1 identity 1 inc 5) => (factorial 5))
+(check (accumulate-iter * 1 identity 1 inc 5) => (factorial 5))
+
+;; Exercise 1.33
+(define (filtered-accumulate filter combiner null-value term a next b)
+  (define (helper a)
+    (define filtered-term (if (filter a) (term a) null-value))
+    (if (> a b)
+        null-value
+        (combiner filtered-term (helper (next a)))))
+  (helper a))
+
+(define (filtered-accumulate-iter filter combiner null-value term a next b)
+  (define (helper a result)
+    (define filtered-term (if (filter a) (term a) null-value))
+    (if (> a b)
+        result
+        (helper (next a) (combiner filtered-term result))))
+  (helper a null-value))
+
+(filtered-accumulate (lambda (x) #t) * 1 identity 1 inc 10)
+(filtered-accumulate-iter (lambda (x) #t) * 1 identity 1 inc 10)
+
+(filtered-accumulate odd? * 1 identity 1 inc 10)
+(filtered-accumulate-iter odd? * 1 identity 1 inc 10)
