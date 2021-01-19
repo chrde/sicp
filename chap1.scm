@@ -102,6 +102,71 @@
   (* (sum f (+ a (/ dx 2.0)) add-dx b)
      dx))
 
+;; 1.3.3 - Half-interval method
+(define (search f neg-point pos-point)
+  (define (close-enough? x y)
+    (< (abs (- x y)) 0.001))
+  (let ((midpoint
+          (average neg-point pos-point)))
+    (if (close-enough? neg-point pos-point)
+        midpoint
+        (let ((test-value (f midpoint)))
+          (cond
+            ((positive? test-value) (search f neg-point midpoint))
+            ((negative? test-value) (search f midpoint pos-point))
+            (else midpoint))))))
+
+(define (half-interval-method f a b)
+  (let ((a-value (f a))
+        (b-value (f b)))
+    (cond ((and (negative? a-value)
+                (positive? b-value))
+           (search f a b))
+          ((and (negative? b-value)
+                (positive? a-value))
+           (search f b a))
+          (else (error "Values are not of opposite sign" a b)))))
+
+;; 1.3.3 Fixed-point
+(define tolerance 0.00001)
+
+(define debug #f)
+(define (print value)
+  (when debug
+    (display value)
+    (newline)))
+
+(define (fixed-point f first-guess)
+  (define (close-enough? v1 v2)
+    (< (abs (- v1 v2)) tolerance))
+  (define (try guess)
+    (print guess)
+    (let ((next (f guess)))
+      (if (close-enough? guess next)
+          next
+          (try next))))
+  (try first-guess))
+
+;; 1.3.4 Derivative
+(define dx 0.0001)
+(define (deriv g)
+  (lambda (x)
+    (/ (- (g (+ x dx)) (g x))
+       dx)))
+(define (newton-transform g)
+  (lambda (x)
+    (- x (/ (g x)
+            ((deriv g) x)))))
+(define (newtons-method g guess)
+  (fixed-point (newton-transform g)
+               guess))
+
+(define (sqrt2 x)
+  (newtons-method
+    (lambda (y)
+      (- (square y) x))
+    1.0))
+
 ;; Exercise 1.7
 (define (sqrt1 x)
   (define (improve guess)
@@ -430,3 +495,142 @@
 
 (filtered-accumulate odd? * 1 identity 1 inc 10)
 (filtered-accumulate-iter odd? * 1 identity 1 inc 10)
+
+;; Exercise 1.34
+(define (f g) (g 2))
+(f f)
+
+;; Exercise 1.35
+(define (golden-ratio)
+  (fixed-point (lambda (x) (inc (/ 1 x))) 1.0))
+
+(define debug #t)
+
+(golden-ratio)
+
+;; Exercise 1.36
+(define (x-pow-x x)
+  (fixed-point (lambda (x) (/ (log 1000) (log x))) x))
+
+(define (x-pow-x-avg x)
+  (fixed-point (lambda (x) (average x
+                                    (/ (log 1000) (log x))))
+               x))
+
+(x-pow-x 42)
+(x-pow-x-avg 42)
+
+;; Exercise 1.37
+(define (cont-frac n d k)
+  (define (helper x)
+    (if (= x k)
+        (/ (n x) (d x))
+        (/ (n x) (+ (d x) (helper (inc x))))))
+  (helper 1))
+
+(define (cont-frac-iter n d k)
+  (define (helper x result)
+    (if (zero? x)
+        result
+        (helper (dec x) (/ (n x) (+ (d x) result)))))
+  (helper k 0.0))
+
+(cont-frac-iter (lambda (i) 1.0)
+           (lambda (i) 1.0)
+           12)
+
+(cont-frac (lambda (i) 1.0)
+           (lambda (i) 1.0)
+           12)
+
+;; Exercise 1.38
+(define (euler-approx x)
+  (define (n i) 1)
+  (define (d i)
+    (if (= (remainder i 3) 2)
+        (* 2 (inc (floor (/ i 3))))
+        1))
+  (exact->inexact (+ 2 (cont-frac n d x))))
+
+(euler-approx 12)
+
+;; Exercise 1.39
+(define (tan-cf x k)
+  (define (n i) (if (= i 1) x (- (square x))))
+  (define (d i) (- (* 2 i) 1))
+  (exact->inexact (cont-frac n d k)))
+
+(tan-cf 0.69 5)
+
+;; Exercise 1.40
+(define (cubic a b c)
+  (lambda (x)
+    (+ (* x x x)
+       (* a (square x))
+       (* b x)
+       c)))
+
+(newtons-method (cubic 3 2 1) 1)
+
+;; Exercise 1.41
+(define (double f)
+  (lambda (x)
+    (f (f x))))
+
+(check (((double (double double)) inc) 5) => 21)
+
+;; Exercise 1.42
+(define (compose f g)
+  (lambda (x)
+    (f (g x))))
+
+(check ((compose square inc) 6) => 49)
+
+;; Exercise 1.43
+(define (repeated f n)
+  (define (recur y result)
+    (if (zero? y)
+        result
+        (recur (dec y) (f result))))
+  (lambda (x)
+    (recur (dec n) (f x))))
+
+((repeated square 2) 5)
+
+(define (repeated-compose f n)
+  (if (zero? n)
+      (lambda (x) x)
+      (compose f (repeated-compose f (dec n)))))
+
+((repeated-compose square 2) 5)
+
+;; Exercise 1.44
+(define (smooth f)
+  (define dx 0.00001)
+  (lambda (x)
+    (/ (+ (f x)
+          (f (- x dx))
+          (f (+ x dx)))
+       3)))
+
+(define (n-fold f n)
+  (repeated (smooth f) n))
+
+;; Exercise 1.46
+(define (iterative-improve good-enough? improve)
+  (define (recur x)
+    (if (good-enough? x)
+        x
+        (recur (improve x))))
+  (lambda (x)
+    (recur x)))
+
+(define (iter-impr-sqrt x)
+  (define (good-enough? guess)
+    (< (abs (- (square guess) x)) 0.0001))
+  (define (improve guess)
+    (average guess (/ x guess)))
+  ((iterative-improve good-enough? improve) 1.0))
+
+(iter-impr-sqrt 5)
+
