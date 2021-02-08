@@ -7,7 +7,15 @@
     "keep_scroll": true
   },
   {
-    "name": "Start REPL",
+    "name": "Load chap 2_2",
+    "command": ",enter chap2.rkt"
+  },
+  {
+    "name": "Start REPL(racket)",
+    "command": "racket"
+  },
+  {
+    "name": "Start REPL(guile)",
     "command": "guile"
   }
 ]
