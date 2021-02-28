@@ -7,15 +7,21 @@
     "keep_scroll": true
   },
   {
-    "name": "Load chap 2_2",
+    "name": "Start REPL(guile)",
+    "command": "guile"
+  },
+  {
+    "name": "Load file(guile)",
+    "command": "Texec ,l\\ %",
+    "keep_scroll": true,
+    "type": "vim"
+  },
+  {
+    "name": "Load chap 2_2 (racket)",
     "command": ",enter chap2.rkt"
   },
   {
     "name": "Start REPL(racket)",
     "command": "racket"
-  },
-  {
-    "name": "Start REPL(guile)",
-    "command": "guile"
   }
 ]
